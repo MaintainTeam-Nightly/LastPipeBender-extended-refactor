@@ -86,7 +86,7 @@ jobs:
         run: >-
           ./gradlew assembleRelease
           --stacktrace
-          -DpackageSuffix=nightly
+          -DpackageSuffix=extended_refactor
           -DversionNameSuffix=-${{ steps.tagger.outputs.new_version_id }}-$(date -u '+%Y%m%d%H%M')
           -DversionCodeOverride=${{ steps.tagger.outputs.new_version_id }}
 
