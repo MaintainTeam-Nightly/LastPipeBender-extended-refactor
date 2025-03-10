@@ -1,6 +1,6 @@
 # Hypatia-Dev
 
-Auto development version builds of Hypatia (Release version)<br>
+Auto development version builds of LastPipeBender in `extended-refactor` branch (Release version)<br>
 Can be installed via our [Nigthly f-droid repo](https://github.com/MaintainTeam-nightly/fdroid-pages)<br>
 It skips creating a release, if no changes were made in the last day.<br>
 

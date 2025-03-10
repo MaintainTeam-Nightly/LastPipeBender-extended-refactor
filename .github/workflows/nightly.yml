@@ -27,8 +27,8 @@ jobs:
       
       - uses: actions/checkout@v4
         with:
-          repository: 'MaintainTeam/Hypatia'
-          ref: 'share-file-to-scan'
+          repository: 'MaintainTeam/LastPipeBender'
+          ref: 'extended-refactor'
           path: workdir
       
       - name: Check if release is required
@@ -107,8 +107,8 @@ jobs:
         if: ${{ env.do_release == 'true' }}
         id: rename_apk
         run: |
-          mv "workdir/app/build/outputs/apk/release/app-release-unsigned.apk" "workdir/app/build/outputs/apk/release/Hypatia_${{steps.tagger.outputs.new_tag}}.apk"
-          echo "apkFile=workdir/app/build/outputs/apk/release/Hypatia_${{steps.tagger.outputs.new_tag}}.apk" >> $GITHUB_OUTPUT
+          mv "workdir/app/build/outputs/apk/release/app-release-unsigned.apk" "workdir/app/build/outputs/apk/release/LastPipeBender_${{steps.tagger.outputs.new_tag}}.apk"
+          echo "apkFile=workdir/app/build/outputs/apk/release/LastPipeBender_${{steps.tagger.outputs.new_tag}}.apk" >> $GITHUB_OUTPUT
 
       - name: Create GitHub release with APK
         if: ${{ env.do_release == 'true' }}
@@ -116,7 +116,7 @@ jobs:
         with:
           tag_name: ${{ steps.tagger.outputs.new_tag }}
           body: |
-            Build of [``${{ steps.release_check.outputs.current_commit }}``](https://github.com/MaintainTeam/Hypatia/commit/${{ steps.release_check.outputs.current_commit }})
+            Build of [``${{ steps.release_check.outputs.current_commit }}``](https://github.com/MaintainTeam/LastPipeBender/commit/${{ steps.release_check.outputs.current_commit }})
           files: |
             ${{steps.rename_apk.outputs.apkFile}}
       
