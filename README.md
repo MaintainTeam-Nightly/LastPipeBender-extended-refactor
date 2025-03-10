@@ -1,4 +1,4 @@
-# Hypatia-Dev
+# LastPipeBender - Extended + Refactor
 
 Auto development version builds of LastPipeBender in `extended-refactor` branch (Release version)<br>
 Can be installed via our [Nigthly f-droid repo](https://github.com/MaintainTeam-nightly/fdroid-pages)<br>
