@@ -1,0 +1,37 @@
+name: Delete old releases
+
+on:
+  schedule: 
+    - cron: '15 23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Related: https://github.com/actions/checkout/issues/1471
+      - name: Fetch tags
+        run: git fetch --prune --unshallow --tags
+
+      - name: Delete old releases if required
+        run: |
+          # Keep last 50 releases
+          tags_to_delete=($(git tag --sort=-v:refname | grep nightly- | tail -n+50))
+
+          if (( ${#tags_to_delete[@]} )); then
+            echo "Will delete ${tags_to_delete[*]}"
+            for tag_to_delete in "${tags_to_delete[@]}"
+            do
+               echo "Deleting $tag_to_delete"
+               git push -v --delete origin "$tag_to_delete"
+               # Delete GitHub release if present
+               gh release delete -y "$tag_to_delete" || true
+            done
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}

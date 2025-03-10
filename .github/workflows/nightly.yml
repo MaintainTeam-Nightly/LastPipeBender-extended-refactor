@@ -1,0 +1,135 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      ignore_commits_force_release:
+        type: boolean
+        description: 'Do not check for new commits / Force new release'
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # This is required for checking out the tags, so that the next tag can be computed
+          fetch-depth: '0'
+      
+      - uses: actions/checkout@v4
+        with:
+          repository: 'MaintainTeam/Hypatia'
+          ref: 'share-file-to-scan'
+          path: workdir
+      
+      - name: Check if release is required
+        id: release_check
+        run: |
+          last_built_commit=$(cat last-built-commit.txt || echo "")
+          current_commit=$(cd workdir && git rev-parse HEAD)
+
+          echo "Last built commit: $last_built_commit"
+          echo "Current commit: $current_commit"
+
+          do_release=false
+
+          if [[ "${{ inputs.ignore_commits_force_release }}" == "true" ]]; then
+            echo "Ignoring commits - Forcing release"
+            do_release=true
+          elif [[ "$last_built_commit" != "$current_commit" ]]; then
+            echo "Commits differ - Will do a release"
+            do_release=true
+          fi
+
+          if [[ "$do_release" != "true" ]]; then
+            echo "No release required: Nothing changed"
+            exit 0
+          fi
+
+          echo "Saving current commit to file"
+          echo "$current_commit" > last-built-commit.txt
+
+          echo "do_release=true" >> $GITHUB_ENV
+          echo "current_commit=$current_commit" >> $GITHUB_OUTPUT
+          
+      - uses: actions/setup-java@v4
+        if: ${{ env.do_release == 'true' }}
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Determine next tag
+        if: ${{ env.do_release == 'true' }}
+        id: tagger
+        run: |
+          TAG="$(git tag --sort=-v:refname | grep nightly- | head -n 1)"
+          VERSION="$(echo $TAG | sed -e s/[^0-9]//g)"
+          INCREMENT="$((VERSION + 1))"
+          NEW_TAG="nightly-${INCREMENT}"
+          echo next tag "${NEW_TAG}"
+          echo "new_tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "new_version_id=${INCREMENT}" >> $GITHUB_OUTPUT
+
+      - name: Build release apk
+        if: ${{ env.do_release == 'true' }}
+        working-directory: workdir
+        run: >-
+          ./gradlew assembleRelease
+          --stacktrace
+          -DpackageSuffix=nightly
+          -DversionNameSuffix=-${{ steps.tagger.outputs.new_version_id }}-$(date -u '+%Y%m%d%H%M')
+          -DversionCodeOverride=${{ steps.tagger.outputs.new_version_id }}
+
+      - name: Tag commit
+        if: ${{ env.do_release == 'true' }}
+        run: git tag "${{ steps.tagger.outputs.new_tag }}"
+
+      - name: Sign Release
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          echo "${KEYSTORE}" | base64 -d > apksign.keystore
+          ${ANDROID_HOME}/build-tools/34.0.0/apksigner sign --ks apksign.keystore --ks-pass env:SIGNING_STORE_PASSWORD "workdir/app/build/outputs/apk/release/app-release-unsigned.apk"
+          rm -f apksign.keystore
+
+      - name: Rename apk
+        if: ${{ env.do_release == 'true' }}
+        id: rename_apk
+        run: |
+          mv "workdir/app/build/outputs/apk/release/app-release-unsigned.apk" "workdir/app/build/outputs/apk/release/Hypatia_${{steps.tagger.outputs.new_tag}}.apk"
+          echo "apkFile=workdir/app/build/outputs/apk/release/Hypatia_${{steps.tagger.outputs.new_tag}}.apk" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub release with APK
+        if: ${{ env.do_release == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tagger.outputs.new_tag }}
+          body: |
+            Build of [``${{ steps.release_check.outputs.current_commit }}``](https://github.com/MaintainTeam/Hypatia/commit/${{ steps.release_check.outputs.current_commit }})
+          files: |
+            ${{steps.rename_apk.outputs.apkFile}}
+      
+      - name: Commit changed files
+        if: ${{ env.do_release == 'true' }}
+        run: |
+          echo "Removing workdir"
+          rm -rf workdir
+
+          echo "Configuring git"
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          echo "Committing changed tracking files"
+          git add -A || true
+          git commit -m "Updated tracking files" && git push || true
