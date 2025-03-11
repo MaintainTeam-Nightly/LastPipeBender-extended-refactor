@@ -95,6 +95,7 @@ jobs:
         run: git tag "${{ steps.tagger.outputs.new_tag }}"
 
       - name: Sign Release
+        if: ${{ env.do_release == 'true' }}
         env:
           KEYSTORE: ${{ secrets.KEYSTORE }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
